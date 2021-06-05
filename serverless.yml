@@ -1,0 +1,103 @@
+# Read the documentation at https://www.serverless.com/framework/docs/providers/aws/guide/serverless.yml/
+service: symfony
+
+provider:
+  name: aws
+  # The AWS region in which to deploy (us-east-1 is the default)
+  region: eu-west-1
+  # The stage of the application, e.g. dev, production, staging… ('dev' is the default)
+  stage: dev
+  runtime: provided.al2
+  profile: bref
+  environment:
+    # Symfony environment variables
+    APP_ENV: prod
+
+plugins:
+  - serverless-vpc-plugin
+  - ./vendor/bref/bref
+functions:
+  # This function runs the Symfony website/API
+  web:
+    handler: public/index.php
+    timeout: 28 # in seconds (API Gateway has a timeout of 29 seconds)
+    layers:
+      - ${bref:layer.php-80-fpm}
+    events:
+      - httpApi: 'GET /no-efs'
+
+  efs:
+    handler: public/index-efs.php
+    timeout: 28 # in seconds (API Gateway has a timeout of 29 seconds)
+    dependsOn:
+      - MountTarget1
+      - MountTarget2
+      - MountTarget3
+    fileSystemConfig:
+      arn:
+        Fn::GetAtt:
+          - EfsAccessPoint
+          - Arn
+      localMountPath: /mnt/cache
+    layers:
+      - ${bref:layer.php-80-fpm}
+    events:
+      - httpApi: 'GET /with-efs'
+
+package:
+  patterns:
+    # Excluded files and folders for deployment
+    - '!assets/**'
+    - '!node_modules/**'
+    - '!public/build/**'
+    - '!tests/**'
+    - '!var/**'
+    # If you want to include files and folders that are part of excluded folders,
+    # add them at the end
+    - 'var/cache/prod/**'
+
+custom:
+  vpcConfig:
+    enabled: true
+    cidrBlock: '10.0.0.0/16'
+
+resources:
+  Resources:
+    FileSystem:
+      Type: AWS::EFS::FileSystem
+      Properties:
+        PerformanceMode: generalPurpose
+    EfsAccessPoint:
+      Type: AWS::EFS::AccessPoint
+      Properties:
+        FileSystemId: !Ref FileSystem
+        PosixUser:
+          Uid: "1000"
+          Gid: "1000"
+        RootDirectory:
+          CreationInfo:
+            OwnerGid: "1000"
+            OwnerUid: "1000"
+            Permissions: "0777"
+          Path: '/cache'
+    MountTarget1:
+      Type: AWS::EFS::MountTarget
+      Properties:
+        FileSystemId: !Ref FileSystem
+        SubnetId: !Ref AppSubnet1
+        SecurityGroups:
+          - !Ref AppSecurityGroup
+    MountTarget2:
+      Type: AWS::EFS::MountTarget
+      Properties:
+        FileSystemId: !Ref FileSystem
+        SubnetId: !Ref AppSubnet2
+        SecurityGroups:
+          - !Ref AppSecurityGroup
+    MountTarget3:
+      Type: AWS::EFS::MountTarget
+      Properties:
+        FileSystemId: !Ref FileSystem
+        SubnetId: !Ref AppSubnet3
+        SecurityGroups:
+          - !Ref AppSecurityGroup

@@ -4,30 +4,11 @@ namespace App;
 
 use Symfony\Bundle\FrameworkBundle\Kernel\MicroKernelTrait;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
-use Symfony\Component\HttpKernel\Kernel as BaseKernel;
 use Symfony\Component\Routing\Loader\Configurator\RoutingConfigurator;
 
-class Kernel extends BaseKernel
+class BrefKernel extends \Bref\SymfonyBridge\BrefKernel
 {
     use MicroKernelTrait;
-
-    public function getCacheDir()
-    {
-        if (isset($_SERVER['LAMBDA_TASK_ROOT'])) {
-            return '/mnt/cache/'.$this->environment;
-        }
-
-        return parent::getCacheDir();
-    }
-
-    public function getLogDir()
-    {
-        if (isset($_SERVER['LAMBDA_TASK_ROOT'])) {
-            return '/tmp/log/';
-        }
-
-        return parent::getLogDir();
-    }
 
     protected function configureContainer(ContainerConfigurator $container): void
     {
